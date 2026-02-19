@@ -8,6 +8,84 @@ import { TaskRunner } from "./core/taskRunner";
 import type { JobState } from "./types";
 import { INTERVALS } from "./types";
 
+function buildResearchPrompt(state: JobState): string {
+  const intervalSummary = INTERVALS.map((interval) => {
+    const count = state.data[interval]?.length ?? 0;
+    return `${interval}: ${count} candles`;
+  }).join(", ");
+
+  const available = INTERVALS.filter((interval) => (state.data[interval]?.length ?? 0) > 0).join(", ");
+
+  return `You are a quantitative trading research assistant focused on ultra-short-term (scalp) setups. Your job is to produce a structured list of scalp trade candidates, with explicit uncertainty, estimated probabilities, and clear risk management — strictly for educational purposes, not financial advice.
+
+INPUTS RECEIVED
+- Market: ${state.symbol} perpetual futures
+- Recent candles (OHLCV) for multiple intervals: ${available || "none"}
+- Candle counts by interval: ${intervalSummary}
+- Optional: fees, slippage assumptions, timezone, and the exchange session constraints (not provided)
+- Optional: my risk constraints (max loss per trade, max leverage, max trades per hour) (not provided)
+
+HARD RULES
+- Do NOT claim certainty or “guaranteed” outcomes.
+- Probabilities / win-rates must be framed as estimates derived from:
+  (a) a described historical backtest on the provided data, OR
+  (b) a clearly stated heuristic scoring model.
+- If the provided data is insufficient to compute honest probabilities, explicitly say so and output only:
+  - setup description,
+  - what data you need to estimate probabilities,
+  - and a “no probability estimate” marker.
+
+WHAT TO OUTPUT
+Produce a concise but information-rich report with:
+1) Assumptions
+- Fees, slippage, execution latency, and whether signals use closed candles only.
+
+2) Scalp setup list (5–12 items)
+For each setup, include:
+- Setup name (e.g., “Pullback to VWAP in uptrend”)
+- Direction: Long/Short
+- Timeframe to execute on (usually 1m; confirmation on 5m/15m)
+- Entry trigger (objective, rules-based)
+- Invalidation/Stop (objective)
+- Targets (TP1/TP2) and rationale
+- Estimated probability of success (win-rate %) with:
+  - method used (mini-backtest on last N samples OR heuristic score)
+  - sample size and limitations
+- Expected value or at minimum R:R guidance
+- “Why this trade exists” (market structure, volatility regime, momentum/mean reversion)
+- Risk notes (news risk, range conditions, spread widening)
+
+3) Regime filter
+Explain what market regimes your suggestions assume:
+- trending vs ranging
+- high vs low volatility
+- how you detect regime from candles
+
+4) Safety and execution checklist
+A short checklist:
+- avoid trading around major macro news
+- confirm liquidity/spread
+- use limit orders or define slippage assumption
+- cap max losses and stop trading after X consecutive losses
+
+SCORING / PROBABILITY GUIDANCE (IF NO FULL BACKTEST)
+If you can’t backtest, use a consistent scoring model and map score → probability range:
+- Factors (each 0–2 points): higher-timeframe alignment, volatility suitability (ATR), momentum confirmation, key level proximity, signal cleanliness, time-of-day liquidity
+- Total score 0–12 → probability bands (example):
+  - 10–12: 55–62%
+  - 7–9: 50–55%
+  - 4–6: 45–50%
+  - 0–3: “no edge detected”
+Make it clear these are heuristic bands, not guarantees.
+
+FORMAT
+- Use a clean table-like markdown structure (no code blocks unless asked).
+- Keep each setup brief but complete.
+- Use consistent terminology and avoid vague entries like “looks bullish”.
+
+BEGIN by restating the inputs you received and whether they’re sufficient to estimate probabilities.`;
+}
+
 export default function App() {
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const [proxyBaseUrl, setProxyBaseUrl] = useState("");
@@ -17,6 +95,7 @@ export default function App() {
   const [validationMsg, setValidationMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [copyMsg, setCopyMsg] = useState("");
 
   const runnerRef = useRef<TaskRunner | null>(null);
 
@@ -59,6 +138,7 @@ export default function App() {
   const completedCount = state ? INTERVALS.filter((it) => state.tasks[it].status === "done").length : 0;
   const allCompleted = completedCount === INTERVALS.length;
   const anyCompleted = completedCount > 0;
+  const researchPrompt = state ? buildResearchPrompt(state) : "";
 
   async function handleValidateSymbol() {
     const normalized = normalizeSymbol(symbolInput);
@@ -132,6 +212,21 @@ export default function App() {
     downloadWorkbook(state);
   }
 
+  async function handleCopyPrompt() {
+    if (!researchPrompt) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(researchPrompt);
+      setCopyMsg("Prompt copied.");
+      window.setTimeout(() => setCopyMsg(""), 1800);
+    } catch {
+      setCopyMsg("Failed to copy prompt.");
+      window.setTimeout(() => setCopyMsg(""), 1800);
+    }
+  }
+
   return (
     <main className="container">
       <h1>Binance Futures Kline Excel Builder</h1>
@@ -183,6 +278,16 @@ export default function App() {
 
       {state ? <ProgressList state={state} nowMs={nowMs} /> : null}
       {state ? <LogPanel logs={state.logs} /> : null}
+      {state && anyCompleted ? (
+        <section className="panel">
+          <h2>Prompt (customized for Pair)</h2>
+          <div className="button-row">
+            <button onClick={handleCopyPrompt}>Copy prompt</button>
+            {copyMsg ? <span className="note">{copyMsg}</span> : null}
+          </div>
+          <textarea className="prompt-box" value={researchPrompt} readOnly />
+        </section>
+      ) : null}
 
       <footer className="footer">
         <span>Intervals: {INTERVALS.join(", ")}</span>

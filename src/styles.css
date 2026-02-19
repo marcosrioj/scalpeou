@@ -134,6 +134,21 @@ button:disabled {
   padding: 8px;
 }
 
+.prompt-box {
+  width: 100%;
+  min-height: 320px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  resize: vertical;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #101828;
+  background: #fcfcfd;
+}
+
 .log-line {
   font-family: "IBM Plex Mono", "Consolas", monospace;
   font-size: 0.85rem;
