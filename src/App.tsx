@@ -8,6 +8,14 @@ import { TaskRunner } from "./core/taskRunner";
 import type { JobState } from "./types";
 import { INTERVALS } from "./types";
 
+const SCALP_TYPE_OPTIONS = [
+  { value: "trend_follow", label: "Trend follow (continuidade)" },
+  { value: "pullback", label: "Pullback em tendência" },
+  { value: "breakout", label: "Breakout de faixa" },
+  { value: "mean_reversion", label: "Mean reversion (retorno à média)" },
+  { value: "liquidity_sweep", label: "Liquidity sweep / stop hunt" }
+] as const;
+
 function buildResearchPrompt(state: JobState): string {
   const intervalSummary = INTERVALS.map((interval) => {
     const count = state.data[interval]?.length ?? 0;
@@ -86,6 +94,50 @@ FORMAT
 BEGIN by restating the inputs you received and whether they’re sufficient to estimate probabilities.`;
 }
 
+function buildQuickScalpPrompt(state: JobState, scalpType: string): string {
+  const intervalSummary = INTERVALS.map((interval) => {
+    const count = state.data[interval]?.length ?? 0;
+    return `${interval}: ${count} candles`;
+  }).join(", ");
+
+  const available = INTERVALS.filter((interval) => (state.data[interval]?.length ?? 0) > 0).join(", ");
+  const selectedScalpLabel = SCALP_TYPE_OPTIONS.find((option) => option.value === scalpType)?.label ?? scalpType;
+
+  return `Você é um assistente de análise de scalp em cripto para resposta rápida (sem backtest).
+
+INPUTS
+- Par: ${state.symbol} perpetual futures
+- Timeframes disponíveis: ${available || "none"}
+- Candle counts: ${intervalSummary}
+- Tipo de scalp selecionado: ${selectedScalpLabel}
+
+TAREFA
+Entregar apenas um diagnóstico rápido com:
+1) Probabilidade estimada de LONG (%)
+2) Probabilidade estimada de SHORT (%)
+3) Viés final: LONG, SHORT ou NEUTRO
+4) Justificativa curta (3-5 bullets objetivos)
+
+REGRAS OBRIGATÓRIAS
+- Não usar backtest e não citar taxa de acerto histórica.
+- As probabilidades devem ser heurísticas e somar 100%.
+- Basear resposta em estrutura, momentum, volatilidade e contexto dos candles recebidos.
+- Validar Squeeze Pro obrigatoriamente e informar:
+  - se há squeeze ativo: SIM/NÃO
+  - lado identificado: COMPRADOR / VENDEDOR / INCONCLUSIVO
+- Se dados forem insuficientes, manter formato e marcar confiança baixa.
+
+FORMATO DA SAÍDA
+- Prob. LONG: X%
+- Prob. SHORT: Y%
+- Viés: LONG | SHORT | NEUTRO
+- Squeeze Pro: ativo (SIM/NÃO), lado (COMPRADOR/VENDEDOR/INCONCLUSIVO)
+- Leitura rápida:
+  - bullet 1
+  - bullet 2
+  - bullet 3`;
+}
+
 export default function App() {
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const [proxyBaseUrl, setProxyBaseUrl] = useState("");
@@ -96,6 +148,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
   const [copyMsg, setCopyMsg] = useState("");
+  const [copyQuickMsg, setCopyQuickMsg] = useState("");
+  const [selectedScalpType, setSelectedScalpType] = useState("");
 
   const runnerRef = useRef<TaskRunner | null>(null);
 
@@ -139,6 +193,7 @@ export default function App() {
   const allCompleted = completedCount === INTERVALS.length;
   const anyCompleted = completedCount > 0;
   const researchPrompt = state ? buildResearchPrompt(state) : "";
+  const quickScalpPrompt = state && selectedScalpType ? buildQuickScalpPrompt(state, selectedScalpType) : "";
 
   async function handleValidateSymbol() {
     const normalized = normalizeSymbol(symbolInput);
@@ -227,6 +282,21 @@ export default function App() {
     }
   }
 
+  async function handleCopyQuickPrompt() {
+    if (!quickScalpPrompt) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(quickScalpPrompt);
+      setCopyQuickMsg("Quick prompt copied.");
+      window.setTimeout(() => setCopyQuickMsg(""), 1800);
+    } catch {
+      setCopyQuickMsg("Failed to copy quick prompt.");
+      window.setTimeout(() => setCopyQuickMsg(""), 1800);
+    }
+  }
+
   return (
     <main className="container">
       <h1>Binance Futures Kline Excel Builder</h1>
@@ -286,6 +356,30 @@ export default function App() {
             {copyMsg ? <span className="note">{copyMsg}</span> : null}
           </div>
           <textarea className="prompt-box" value={researchPrompt} readOnly />
+
+          <h2>Quick Scalp Prompt (no backtest)</h2>
+          <label>
+            Scalp type
+            <select value={selectedScalpType} onChange={(event) => setSelectedScalpType(event.target.value)}>
+              <option value="">Choose a scalp type...</option>
+              {SCALP_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="button-row">
+            <button onClick={handleCopyQuickPrompt} disabled={!quickScalpPrompt}>
+              Copy quick prompt
+            </button>
+            {copyQuickMsg ? <span className="note">{copyQuickMsg}</span> : null}
+          </div>
+          <textarea
+            className="prompt-box prompt-box-compact"
+            value={quickScalpPrompt || "Choose a scalp type to generate a quick long/short probability prompt."}
+            readOnly
+          />
         </section>
       ) : null}
 

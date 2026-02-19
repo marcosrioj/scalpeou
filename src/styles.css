@@ -55,12 +55,15 @@ label {
   font-size: 0.95rem;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 0.95rem;
+  background: #fff;
+  color: #101828;
 }
 
 button {
@@ -147,6 +150,10 @@ button:disabled {
   line-height: 1.4;
   color: #101828;
   background: #fcfcfd;
+}
+
+.prompt-box-compact {
+  min-height: 220px;
 }
 
 .log-line {
