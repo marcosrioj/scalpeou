@@ -9,10 +9,11 @@ import type { JobState } from "./types";
 import { INTERVALS } from "./types";
 
 const SCALP_TYPE_OPTIONS = [
-  { value: "trend_follow", label: "Trend follow (continuidade)" },
-  { value: "pullback", label: "Pullback em tendência" },
-  { value: "breakout", label: "Breakout de faixa" },
-  { value: "mean_reversion", label: "Mean reversion (retorno à média)" },
+  { value: "none", label: "None (no specific scalp type)" },
+  { value: "trend_follow", label: "Trend follow (continuation)" },
+  { value: "pullback", label: "Pullback in trend" },
+  { value: "breakout", label: "Range breakout" },
+  { value: "mean_reversion", label: "Mean reversion" },
   { value: "liquidity_sweep", label: "Liquidity sweep / stop hunt" }
 ] as const;
 
@@ -103,36 +104,38 @@ function buildQuickScalpPrompt(state: JobState, scalpType: string): string {
   const available = INTERVALS.filter((interval) => (state.data[interval]?.length ?? 0) > 0).join(", ");
   const selectedScalpLabel = SCALP_TYPE_OPTIONS.find((option) => option.value === scalpType)?.label ?? scalpType;
 
-  return `Você é um assistente de análise de scalp em cripto para resposta rápida (sem backtest).
+  return `You are a crypto scalp analysis assistant for fast output (no backtest).
 
 INPUTS
-- Par: ${state.symbol} perpetual futures
-- Timeframes disponíveis: ${available || "none"}
+- Pair: ${state.symbol} perpetual futures
+- Available timeframes: ${available || "none"}
 - Candle counts: ${intervalSummary}
-- Tipo de scalp selecionado: ${selectedScalpLabel}
+- Selected scalp type: ${selectedScalpLabel}
 
-TAREFA
-Entregar apenas um diagnóstico rápido com:
-1) Probabilidade estimada de LONG (%)
-2) Probabilidade estimada de SHORT (%)
-3) Viés final: LONG, SHORT ou NEUTRO
-4) Justificativa curta (3-5 bullets objetivos)
+TASK
+Provide only a quick diagnostic with:
+1) Estimated LONG probability (%)
+2) Estimated SHORT probability (%)
+3) Final bias: LONG, SHORT, or NEUTRAL
+4) Short rationale (3-5 objective bullets)
 
-REGRAS OBRIGATÓRIAS
-- Não usar backtest e não citar taxa de acerto histórica.
-- As probabilidades devem ser heurísticas e somar 100%.
-- Basear resposta em estrutura, momentum, volatilidade e contexto dos candles recebidos.
-- Validar Squeeze Pro obrigatoriamente e informar:
-  - se há squeeze ativo: SIM/NÃO
-  - lado identificado: COMPRADOR / VENDEDOR / INCONCLUSIVO
-- Se dados forem insuficientes, manter formato e marcar confiança baixa.
+MANDATORY RULES
+- Do not use backtests and do not cite historical win rate.
+- Probabilities must be heuristic and sum to 100%.
+- Base the response on structure, momentum, volatility, and candle context.
+- Validate Squeeze Pro on every selected setup and report:
+  - active squeeze: YES/NO
+  - identified side: BUYERS / SELLERS / INCONCLUSIVE
+  - squeeze timeframes: list exact timeframes where squeeze is present (e.g., 1m, 5m, 15m); if none, state NONE
+  - for each timeframe with squeeze, include the exact timestamp(s) as YYYY-MM-DD HH:mm (at least minute precision)
+- If data is insufficient, keep the same output format and mark confidence as low.
 
-FORMATO DA SAÍDA
+OUTPUT FORMAT
 - Prob. LONG: X%
 - Prob. SHORT: Y%
-- Viés: LONG | SHORT | NEUTRO
-- Squeeze Pro: ativo (SIM/NÃO), lado (COMPRADOR/VENDEDOR/INCONCLUSIVO)
-- Leitura rápida:
+- Bias: LONG | SHORT | NEUTRAL
+- Squeeze Pro: active (YES/NO), side (BUYERS/SELLERS/INCONCLUSIVE), timeframes (list or NONE), timestamps (YYYY-MM-DD HH:mm per timeframe)
+- Quick read:
   - bullet 1
   - bullet 2
   - bullet 3`;
@@ -149,7 +152,7 @@ export default function App() {
   const [nowMs, setNowMs] = useState(Date.now());
   const [copyMsg, setCopyMsg] = useState("");
   const [copyQuickMsg, setCopyQuickMsg] = useState("");
-  const [selectedScalpType, setSelectedScalpType] = useState("");
+  const [selectedScalpType, setSelectedScalpType] = useState("none");
 
   const runnerRef = useRef<TaskRunner | null>(null);
 
@@ -193,7 +196,7 @@ export default function App() {
   const allCompleted = completedCount === INTERVALS.length;
   const anyCompleted = completedCount > 0;
   const researchPrompt = state ? buildResearchPrompt(state) : "";
-  const quickScalpPrompt = state && selectedScalpType ? buildQuickScalpPrompt(state, selectedScalpType) : "";
+  const quickScalpPrompt = state ? buildQuickScalpPrompt(state, selectedScalpType) : "";
 
   async function handleValidateSymbol() {
     const normalized = normalizeSymbol(symbolInput);
@@ -361,7 +364,6 @@ export default function App() {
           <label>
             Scalp type
             <select value={selectedScalpType} onChange={(event) => setSelectedScalpType(event.target.value)}>
-              <option value="">Choose a scalp type...</option>
               {SCALP_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -377,7 +379,7 @@ export default function App() {
           </div>
           <textarea
             className="prompt-box prompt-box-compact"
-            value={quickScalpPrompt || "Choose a scalp type to generate a quick long/short probability prompt."}
+            value={quickScalpPrompt || "Select a scalp type to generate a quick long/short probability prompt."}
             readOnly
           />
         </section>
