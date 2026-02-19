@@ -1,36 +1,120 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Binance Futures Kline Excel Exporter
 
-## Getting Started
+Production-ready Vite + React + TypeScript app that fetches Binance USD-M futures klines for multiple intervals, retries robustly on throttling/transient errors, persists job progress, and exports a single `.xlsx` workbook.
 
-First, run the development server:
+## Features
+
+- Symbol input (`BTCUSDT` default) with uppercase normalization and format validation
+- Binance USD-M Futures endpoint support:
+  - Base: `https://fapi.binance.com`
+  - Endpoint: `/fapi/v1/klines`
+  - Params: `symbol`, `interval`, `limit=1000`
+- Intervals (1000 candles each): `1m`, `5m`, `15m`, `1h`, `2h`, `4h`, `12h`, `1w`, `1M`
+- Queue with `concurrency=1` (one interval task at a time)
+- Retry behavior for `429`, `418`, `5xx`, network/timeouts:
+  - exponential backoff + jitter (max 60s)
+  - honors `Retry-After`/similar headers when present
+  - UI shows `Waiting to retry in N seconds...`
+- Persistence with IndexedDB fallback to localStorage
+  - saves after each interval succeeds
+  - saves queue state to resume after refresh/tab close
+- Auto-resume toggle (default ON)
+- Reset/clear saved state button
+- Excel export (`xlsx` / SheetJS)
+  - one worksheet per interval
+  - `meta` sheet with summary and notes
+
+## Project Structure
+
+```text
+src/
+  api/binance.ts
+  core/storage.ts
+  core/taskRunner.ts
+  core/excel.ts
+  components/
+    ProgressList.tsx
+    LogPanel.tsx
+    SettingsAccordion.tsx
+```
+
+## Local Development
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Run dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Build production files:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Preview build locally:
 
-## Learn More
+```bash
+npm run preview
+```
 
-To learn more about Next.js, take a look at the following resources:
+## GitHub Pages Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+A workflow is included at `.github/workflows/deploy-pages.yml` and deploys on push to `main`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push repository to GitHub.
+2. In GitHub repo settings, open **Pages**.
+3. Set source to **GitHub Actions**.
+4. Push to `main` and let the workflow deploy.
 
-## Deploy on Vercel
+## Vite Base Path for Pages
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`vite.config.ts` resolves base path in this order:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. `VITE_BASE_PATH` (manual override)
+2. On GitHub Actions, `/${repo-name}/`
+3. Local default: `/`
+
+If needed, set explicit base path:
+
+```bash
+VITE_BASE_PATH=/your-repo-name/ npm run build
+```
+
+## CORS and Proxy Option
+
+The app tries direct browser calls to Binance first. If CORS blocks, set **Proxy Base URL** in settings, for example:
+
+`https://your-proxy-domain.example.com`
+
+Then requests go to:
+
+`{proxyBaseUrl}/fapi/v1/klines?...`
+
+## Example Serverless Proxy
+
+Example Node/Express-like handler for public market data forwarding:
+
+```ts
+import type { Request, Response } from "express";
+
+export async function klinesProxy(req: Request, res: Response) {
+  const qs = new URLSearchParams(req.query as Record<string, string>);
+  const url = `https://fapi.binance.com/fapi/v1/klines?${qs.toString()}`;
+
+  const upstream = await fetch(url, { method: "GET" });
+  const body = await upstream.text();
+
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Content-Type", "application/json");
+  res.status(upstream.status).send(body);
+}
+```
+
+For serverless environments, expose it as `GET /fapi/v1/klines` (or `/klines`) and keep it GET-only for public data.
