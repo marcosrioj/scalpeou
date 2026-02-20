@@ -6,7 +6,7 @@ import { SettingsAccordion } from "./components/SettingsAccordion";
 import { downloadWorkbook } from "./core/excel";
 import { TaskRunner } from "./core/taskRunner";
 import type { JobState } from "./types";
-import { INTERVALS } from "./types";
+import { DEFAULT_TIMEZONE, INTERVALS } from "./types";
 
 const SCALP_TYPE_OPTIONS = [
   { value: "none", label: "None (no specific scalp type)" },
@@ -27,11 +27,15 @@ function buildResearchPrompt(state: JobState): string {
 
   return `You are a quantitative trading research assistant focused on ultra-short-term (scalp) setups. Your job is to produce a structured list of scalp trade candidates, with explicit uncertainty, estimated probabilities, and clear risk management — strictly for educational purposes, not financial advice.
 
+TIMEZONE
+- Use ${state.timezone} for every timestamp you mention.
+
 INPUTS RECEIVED
 - Market: ${state.symbol} perpetual futures
 - Recent candles (OHLCV) for multiple intervals: ${available || "none"}
 - Candle counts by interval: ${intervalSummary}
-- Optional: fees, slippage assumptions, timezone, and the exchange session constraints (not provided)
+- Timezone: ${state.timezone}
+- Optional: fees, slippage assumptions, and the exchange session constraints (not provided)
 - Optional: my risk constraints (max loss per trade, max leverage, max trades per hour) (not provided)
 
 HARD RULES
@@ -112,6 +116,9 @@ INPUTS
 - Candle counts: ${intervalSummary}
 - Selected scalp type: ${selectedScalpLabel}
 
+TIMEZONE
+- Use ${state.timezone} for every timestamp you mention.
+
 TASK
 Provide only a quick diagnostic with:
 1) Estimated LONG probability (%)
@@ -145,6 +152,7 @@ export default function App() {
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const [proxyBaseUrl, setProxyBaseUrl] = useState("");
   const [autoResume, setAutoResume] = useState(true);
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
   const [state, setState] = useState<JobState | null>(null);
   const [validating, setValidating] = useState(false);
   const [validationMsg, setValidationMsg] = useState("");
@@ -180,6 +188,7 @@ export default function App() {
         setProxyBaseUrl(current.proxyBaseUrl);
         setAutoResume(current.autoResume);
         setSymbolInput(current.symbol);
+        setTimezone(current.timezone || DEFAULT_TIMEZONE);
       })
       .catch(() => {
         setValidationMsg("Failed to load saved job state.");
@@ -232,14 +241,15 @@ export default function App() {
       await runner.startNewJob({
         symbol: normalized,
         proxyBaseUrl: proxyBaseUrl.trim(),
-        autoResume
+        autoResume,
+        timezone
       });
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleSaveSettings(nextProxy?: string, nextAuto?: boolean) {
+  async function handleSaveSettings(nextProxy?: string, nextAuto?: boolean, nextTz?: string) {
     const runner = runnerRef.current;
     if (!runner) {
       return;
@@ -247,7 +257,8 @@ export default function App() {
 
     await runner.updateSettings({
       proxyBaseUrl: nextProxy ?? proxyBaseUrl,
-      autoResume: nextAuto ?? autoResume
+      autoResume: nextAuto ?? autoResume,
+      timezone: nextTz ?? timezone
     });
   }
 
@@ -339,6 +350,7 @@ export default function App() {
       <SettingsAccordion
         proxyBaseUrl={proxyBaseUrl}
         autoResume={autoResume}
+        timezone={timezone}
         onProxyChange={(value) => {
           setProxyBaseUrl(value);
           void handleSaveSettings(value, undefined);
@@ -347,10 +359,18 @@ export default function App() {
           setAutoResume(value);
           void handleSaveSettings(undefined, value);
         }}
+        onTimezoneChange={(value) => {
+          setTimezone(value);
+          void handleSaveSettings(undefined, undefined, value);
+        }}
       />
 
-      {state ? <ProgressList state={state} nowMs={nowMs} /> : null}
-      {state ? <LogPanel logs={state.logs} /> : null}
+      {state ? (
+        <div className="grid-panels">
+          <ProgressList state={state} nowMs={nowMs} />
+          <LogPanel logs={state.logs} />
+        </div>
+      ) : null}
       {state && anyCompleted ? (
         <section className="panel">
           <h2>Prompt (customized for Pair)</h2>

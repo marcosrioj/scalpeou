@@ -22,9 +22,9 @@ body {
 .container {
   max-width: 980px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 16px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 h1,
@@ -40,7 +40,7 @@ h1 {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 14px;
+  padding: 12px;
 }
 
 .controls {
@@ -91,6 +91,13 @@ button:disabled {
   gap: 8px;
 }
 
+.grid-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
 .accordion-toggle {
   width: 100%;
   text-align: left;
@@ -139,7 +146,7 @@ button:disabled {
 
 .prompt-box {
   width: 100%;
-  min-height: 320px;
+  min-height: 220px;
   margin-top: 10px;
   padding: 10px;
   border: 1px solid #d0d5dd;
@@ -153,7 +160,7 @@ button:disabled {
 }
 
 .prompt-box-compact {
-  min-height: 220px;
+  min-height: 160px;
 }
 
 .log-line {

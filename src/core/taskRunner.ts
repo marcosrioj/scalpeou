@@ -1,7 +1,7 @@
 import { fetchKlines, type BinanceApiError } from "../api/binance";
 import { storage } from "./storage";
 import type { CandleRow, Interval, IntervalTaskState, JobState, TaskStatus } from "../types";
-import { INTERVALS } from "../types";
+import { DEFAULT_TIMEZONE, INTERVALS } from "../types";
 
 const MAX_LOGS = 50;
 const MAX_BACKOFF_MS = 60_000;
@@ -14,6 +14,7 @@ export interface StartJobOptions {
   symbol: string;
   proxyBaseUrl: string;
   autoResume: boolean;
+  timezone: string;
 }
 
 function nowIso(): string {
@@ -91,11 +92,19 @@ export class TaskRunner {
 
   async loadSavedState(): Promise<JobState | null> {
     const saved = await storage.get();
-    this.state = saved;
-    if (saved) {
-      this.callbacks.onStateChange?.(saved);
+    if (!saved) {
+      this.state = null;
+      return null;
     }
-    return saved;
+
+    const withDefaults: JobState = {
+      ...saved,
+      timezone: saved.timezone || DEFAULT_TIMEZONE
+    };
+
+    this.state = withDefaults;
+    this.callbacks.onStateChange?.(withDefaults);
+    return withDefaults;
   }
 
   async startNewJob(options: StartJobOptions): Promise<void> {
@@ -104,6 +113,7 @@ export class TaskRunner {
       symbol: options.symbol,
       proxyBaseUrl: options.proxyBaseUrl,
       autoResume: options.autoResume,
+      timezone: options.timezone || DEFAULT_TIMEZONE,
       createdAtISO: nowIso(),
       updatedAtISO: nowIso(),
       tasks: initialTaskState(),
@@ -115,15 +125,16 @@ export class TaskRunner {
     await this.run();
   }
 
-  async updateSettings(settings: Pick<StartJobOptions, "proxyBaseUrl" | "autoResume">): Promise<void> {
+  async updateSettings(settings: Partial<Pick<StartJobOptions, "proxyBaseUrl" | "autoResume" | "timezone">>): Promise<void> {
     if (!this.state) {
       return;
     }
 
     await this.setState((prev) => ({
       ...prev,
-      proxyBaseUrl: settings.proxyBaseUrl,
-      autoResume: settings.autoResume,
+      proxyBaseUrl: settings.proxyBaseUrl ?? prev.proxyBaseUrl,
+      autoResume: settings.autoResume ?? prev.autoResume,
+      timezone: settings.timezone ?? prev.timezone,
       updatedAtISO: nowIso()
     }));
   }

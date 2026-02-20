@@ -1,5 +1,7 @@
 export const INTERVALS = ["1m", "5m", "15m", "1h", "2h", "4h", "12h", "1w", "1M"] as const;
 
+export const DEFAULT_TIMEZONE = "America/Vancouver";
+
 export type Interval = (typeof INTERVALS)[number];
 
 export type TaskStatus = "pending" | "running" | "retrying" | "done" | "error";
@@ -33,6 +35,7 @@ export interface JobState {
   symbol: string;
   proxyBaseUrl: string;
   autoResume: boolean;
+  timezone: string;
   createdAtISO: string;
   updatedAtISO: string;
   tasks: Record<Interval, IntervalTaskState>;

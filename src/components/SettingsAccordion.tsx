@@ -3,8 +3,10 @@ import { useState } from "react";
 interface SettingsProps {
   proxyBaseUrl: string;
   autoResume: boolean;
+  timezone: string;
   onProxyChange: (value: string) => void;
   onAutoResumeChange: (value: boolean) => void;
+  onTimezoneChange: (value: string) => void;
 }
 
 export function SettingsAccordion(props: SettingsProps) {
@@ -34,6 +36,15 @@ export function SettingsAccordion(props: SettingsProps) {
               onChange={(event) => props.onAutoResumeChange(event.target.checked)}
             />
             Resume unfinished job automatically
+          </label>
+
+          <label>
+            Timezone (IANA)
+            <input
+              value={props.timezone}
+              onChange={(event) => props.onTimezoneChange(event.target.value)}
+              placeholder="America/Vancouver"
+            />
           </label>
         </div>
       ) : null}
