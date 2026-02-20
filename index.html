@@ -11,28 +11,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module">
-      const isGh = location.hostname.includes('github.io');
-      const base = isGh ? '/scalpeou' : '';
-
-      if (isGh) {
-        const css = document.createElement('link');
-        css.rel = 'stylesheet';
-        css.crossOrigin = 'anonymous';
-        css.href = `${base}/assets/index-CPTr6tCk.css`;
-        document.head.appendChild(css);
-
-        const prodScript = document.createElement('script');
-        prodScript.type = 'module';
-        prodScript.crossOrigin = 'anonymous';
-        prodScript.src = `${base}/assets/index-Ca7LQ3eY.js`;
-        document.body.appendChild(prodScript);
-      } else {
-        const devScript = document.createElement('script');
-        devScript.type = 'module';
-        devScript.src = `${base}/src/main.tsx`;
-        document.body.appendChild(devScript);
-      }
-    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

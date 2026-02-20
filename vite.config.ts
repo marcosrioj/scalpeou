@@ -16,7 +16,7 @@ function resolveBasePath() {
     const repo = process.env.GITHUB_REPOSITORY?.split("/")[1];
     if (repo) {
       if (repo.endsWith(".github.io")) {
-        return "/"; // user/organization pages are served from the root domain
+        return "/scalpeou/"; // user/organization pages are served from the root domain
       }
       return normalizeBase(repo);
     }
