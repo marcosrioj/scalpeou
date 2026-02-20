@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isValidSymbol, normalizeSymbol, validateSymbolOnExchange } from "./api/binance";
-import { LogPanel } from "./components/LogPanel";
 import { ProgressList } from "./components/ProgressList";
 import { SettingsAccordion } from "./components/SettingsAccordion";
 import { downloadWorkbook } from "./core/excel";
@@ -169,11 +168,46 @@ export default function App() {
   const [selectedScalpType, setSelectedScalpType] = useState("none");
 
   const runnerRef = useRef<TaskRunner | null>(null);
+  const browserLogSnapshotRef = useRef<string[]>([]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!state) {
+      browserLogSnapshotRef.current = [];
+      return;
+    }
+
+    const prevLogs = browserLogSnapshotRef.current;
+    const nextLogs = state.logs;
+    const maxOverlap = Math.min(prevLogs.length, nextLogs.length);
+    let overlap = 0;
+
+    for (let size = maxOverlap; size > 0; size -= 1) {
+      let matches = true;
+
+      for (let index = 0; index < size; index += 1) {
+        if (prevLogs[prevLogs.length - size + index] !== nextLogs[index]) {
+          matches = false;
+          break;
+        }
+      }
+
+      if (matches) {
+        overlap = size;
+        break;
+      }
+    }
+
+    for (const line of nextLogs.slice(overlap)) {
+      console.log(`[Scalpeou] ${line}`);
+    }
+
+    browserLogSnapshotRef.current = [...nextLogs];
+  }, [state]);
 
   useEffect(() => {
     const runner = new TaskRunner({
@@ -353,39 +387,8 @@ export default function App() {
         <p className="note">Normalized symbol: {symbol}</p>
       </section>
 
-      <SettingsAccordion
-        proxyBaseUrl={proxyBaseUrl}
-        autoResume={autoResume}
-        timezone={timezone}
-        onProxyChange={(value) => {
-          setProxyBaseUrl(value);
-          void handleSaveSettings(value, undefined);
-        }}
-        onAutoResumeChange={(value) => {
-          setAutoResume(value);
-          void handleSaveSettings(undefined, value);
-        }}
-        onTimezoneChange={(value) => {
-          setTimezone(value);
-          void handleSaveSettings(undefined, undefined, value);
-        }}
-      />
-
-      {state ? (
-        <div className="grid-panels">
-          <ProgressList state={state} nowMs={nowMs} />
-          <LogPanel logs={state.logs} />
-        </div>
-      ) : null}
       {state && anyCompleted ? (
         <section className="panel">
-          <h2>Prompt (customized for Pair)</h2>
-          <div className="button-row">
-            <button onClick={handleCopyPrompt}>Copy prompt</button>
-            {copyMsg ? <span className="note">{copyMsg}</span> : null}
-          </div>
-          <textarea className="prompt-box" value={researchPrompt} readOnly />
-
           <h2>Quick Scalp Prompt (no backtest)</h2>
           <label>
             Scalp type
@@ -410,6 +413,37 @@ export default function App() {
           />
         </section>
       ) : null}
+
+      {state && anyCompleted ? (
+        <section className="panel">
+          <h2>Prompt (customized for Pair)</h2>
+          <div className="button-row">
+            <button onClick={handleCopyPrompt}>Copy prompt</button>
+            {copyMsg ? <span className="note">{copyMsg}</span> : null}
+          </div>
+          <textarea className="prompt-box" value={researchPrompt} readOnly />
+        </section>
+      ) : null}
+
+      {state ? <ProgressList state={state} nowMs={nowMs} /> : null}
+
+      <SettingsAccordion
+        proxyBaseUrl={proxyBaseUrl}
+        autoResume={autoResume}
+        timezone={timezone}
+        onProxyChange={(value) => {
+          setProxyBaseUrl(value);
+          void handleSaveSettings(value, undefined);
+        }}
+        onAutoResumeChange={(value) => {
+          setAutoResume(value);
+          void handleSaveSettings(undefined, value);
+        }}
+        onTimezoneChange={(value) => {
+          setTimezone(value);
+          void handleSaveSettings(undefined, undefined, value);
+        }}
+      />
 
       <footer className="footer">
         <span>Intervals: {INTERVALS.join(", ")}</span>
