@@ -59,8 +59,9 @@ For each setup, include:
 - Direction: Long/Short
 - Timeframe to execute on (usually 1m; confirmation on 5m/15m)
 - Entry trigger (objective, rules-based)
-- Invalidation/Stop (objective)
-- Targets (TP1/TP2) and rationale
+- Entry price zone (objective levels)
+- Invalidation/Stop Loss (SL) with exact price level
+- Targets (TP1/TP2) with exact price levels and rationale
 - Estimated probability of success (win-rate %) with:
   - method used (mini-backtest on last N samples OR heuristic score)
   - sample size and limitations
@@ -124,12 +125,14 @@ Provide only a quick diagnostic with:
 1) Estimated LONG probability (%)
 2) Estimated SHORT probability (%)
 3) Final bias: LONG, SHORT, or NEUTRAL
-4) Short rationale (3-5 objective bullets)
+4) Suggested Entry, TP and SL (price levels; if NEUTRAL use N/A)
+5) Short rationale (3-5 objective bullets)
 
 MANDATORY RULES
 - Do not use backtests and do not cite historical win rate.
 - Probabilities must be heuristic and sum to 100%.
 - Base the response on structure, momentum, volatility, and candle context.
+- Always provide objective price levels for Entry, TP and SL.
 - Validate Squeeze Pro on every selected setup and report:
   - active squeeze: YES/NO
   - identified side: BUYERS / SELLERS / INCONCLUSIVE
@@ -141,6 +144,9 @@ OUTPUT FORMAT
 - Prob. LONG: X%
 - Prob. SHORT: Y%
 - Bias: LONG | SHORT | NEUTRAL
+- Entry: price (or range) | N/A
+- TP: price | N/A
+- SL: price | N/A
 - Squeeze Pro: active (YES/NO), side (BUYERS/SELLERS/INCONCLUSIVE), timeframes (list or NONE), timestamps (YYYY-MM-DD HH:mm per timeframe)
 - Quick read:
   - bullet 1
